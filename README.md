@@ -627,7 +627,7 @@ The project follows several modern software development principles:
 ## 1. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
+git clone https://github.com/HiruniWijerathna/Expense-Tracker.git
 ```
 
 ## 2. Open the Project
