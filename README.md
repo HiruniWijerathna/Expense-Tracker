@@ -1,6 +1,10 @@
 # 💰 Smart Expense Tracker & Budget Manager
 
 <p align="center">
+  <img src="banner.png" alt="Fitness App Banner" width="100%" />
+</p>
+
+<p align="center">
   <b>A modern, privacy-focused Android app for managing personal expenses, income, budgets, and financial insights.</b>
 </p>
 
