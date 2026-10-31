@@ -679,7 +679,7 @@ Potential future improvements include:
   ## 🔗 Links
 
 **🎥 Project Demo Video:**
-👉 [Fitness App Video](https://drive.google.com/file/d/1aFUKe--HwChxMh5laVV4v55k4x1C_OsG/view?usp=sharing)
+👉 [Expense Tracker Video](https://drive.google.com/file/d/1aFUKe--HwChxMh5laVV4v55k4x1C_OsG/view?usp=sharing)
 
 ---
 
