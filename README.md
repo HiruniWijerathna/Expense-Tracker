@@ -678,9 +678,6 @@ Potential future improvements include:
 
   ## 🔗 Links
 
-**🎨 Figma Design:**  
-👉 [Fitness App figma design](https://www.figma.com/design/998YDDBCSn5W26vj7eETtx/Untitled?node-id=0-1&p=f&t=9h6T1qVgnaceVqL9-0)
-
 **🎥 Project Demo Video:**
 👉 [Fitness App Video](https://drive.google.com/file/d/1aFUKe--HwChxMh5laVV4v55k4x1C_OsG/view?usp=sharing)
 
