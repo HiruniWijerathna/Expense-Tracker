@@ -34,15 +34,20 @@ import kotlin.math.abs
 fun HomeScreen(
     viewModel: ExpenseViewModel,
     onAddExpense: () -> Unit,
+    onEditExpense: (String) -> Unit = {},
     onNavigate: (String) -> Unit
 ) {
     val expenses by viewModel.expenses.collectAsState()
     val isDarkMode by viewModel.isDarkMode.collectAsState()
+    val monthlyBudget by viewModel.monthlyBudget.collectAsState()
+    val currency by viewModel.currency.collectAsState()
     val recent = viewModel.recentExpenses(8)
 
     val totalExpense = viewModel.totalExpenseThisMonth
     val totalIncome = viewModel.totalIncomeThisMonth
     val balance = totalIncome - totalExpense
+    val remainingBudget = (monthlyBudget - totalExpense).coerceAtLeast(0.0)
+    val budgetProgress = if (monthlyBudget > 0) (totalExpense / monthlyBudget).toFloat().coerceIn(0f, 1f) else 0f
 
     // Animate balance
     val animatedBalance by animateFloatAsState(
@@ -70,7 +75,7 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             item {
-                // Header with dark mode toggle
+                // Header with actions
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -91,23 +96,29 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                     }
-                    IconButton(
-                        onClick = { viewModel.toggleDarkMode() },
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Icon(
-                            if (isDarkMode) Icons.Default.WbSunny else Icons.Default.DarkMode,
-                            contentDescription = "Toggle theme",
-                            tint = if (isDarkMode) AccentYellow else AccentPurple
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IconButton(
+                            onClick = { onNavigate("search_transactions") },
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = PrimaryGreen)
+                        }
+                        IconButton(
+                            onClick = { onNavigate("settings") },
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
+                        }
                     }
                 }
             }
 
             item {
-                // Balance Card
+                // Balance & Income/Expense Card
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -139,13 +150,13 @@ fun HomeScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "LKR ${String.format("%,.0f", abs(animatedBalance.toDouble()))}",
-                            fontSize = 40.sp,
+                            text = "${currency.symbol} ${String.format("%,.0f", abs(animatedBalance.toDouble()))}",
+                            fontSize = 38.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = if (balance >= 0) PrimaryGreen else AccentRed
                         )
                         Text(
-                            text = if (balance >= 0) "✅ You're on track!" else "⚠️ Over budget!",
+                            text = if (balance >= 0) "✅ Healthy Financial Health" else "⚠️ Spending exceeding income!",
                             color = if (balance >= 0) PrimaryGreenLight else AccentRed.copy(alpha = 0.8f),
                             fontSize = 12.sp,
                             modifier = Modifier.padding(top = 4.dp)
@@ -155,18 +166,74 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceAround
                         ) {
-                            MiniStat("Income", totalIncome, PrimaryGreen, "⬆️")
+                            MiniStat("Income", totalIncome, PrimaryGreen, "⬆️", currency.symbol)
                             Box(
                                 modifier = Modifier
                                     .width(1.dp)
                                     .height(40.dp)
                                     .background(TextSecondary.copy(alpha = 0.3f))
                             )
-                            MiniStat("Expenses", totalExpense, AccentRed, "⬇️")
+                            MiniStat("Expenses", totalExpense, AccentRed, "⬇️", currency.symbol)
                         }
                     }
                 }
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
+            }
+
+            // Monthly Budget & Remaining Budget Section
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("🎯", fontSize = 18.sp)
+                                Column {
+                                    Text("Monthly Budget", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text("Target: ${currency.symbol} ${String.format("%,.0f", monthlyBudget)}", fontSize = 12.sp, color = TextSecondary)
+                                }
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("Remaining", fontSize = 11.sp, color = TextSecondary)
+                                Text(
+                                    "${currency.symbol} ${String.format("%,.0f", remainingBudget)}",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = if (remainingBudget > 0) PrimaryGreen else AccentRed
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        LinearProgressIndicator(
+                            progress = { budgetProgress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = if (budgetProgress > 0.85f) AccentRed else PrimaryGreen,
+                            trackColor = MaterialTheme.colorScheme.surface
+                        )
+
+                        Spacer(Modifier.height(8.dp))
+                        val percentage = (budgetProgress * 100).toInt()
+                        Text(
+                            text = if (percentage >= 100) "🚨 Budget exceeded by ${percentage - 100}%!" else "Spent $percentage% of monthly budget",
+                            fontSize = 12.sp,
+                            color = if (percentage >= 85) AccentRed else TextSecondary
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
             }
 
             item {
@@ -183,32 +250,32 @@ fun HomeScreen(
                         label = "Transactions",
                         value = "${expenses.size}",
                         color = AccentBlue,
-                        onClick = {}
+                        onClick = { onNavigate("search_transactions") }
                     )
                     QuickStatCard(
                         modifier = Modifier.weight(1f),
-                        icon = Icons.Default.EmojiEvents,
-                        label = "Achievements",
-                        value = "${viewModel.achievements.value.count { it.isUnlocked }}",
-                        color = AccentYellow,
-                        onClick = { onNavigate("achievements") }
+                        icon = Icons.Default.Category,
+                        label = "Categories",
+                        value = "${viewModel.categories.value.size}",
+                        color = AccentPurple,
+                        onClick = { onNavigate("manage_categories") }
                     )
                     QuickStatCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.Flag,
                         label = "Goals",
                         value = "${viewModel.goals.value.size}",
-                        color = AccentPurple,
+                        color = AccentYellow,
                         onClick = { onNavigate("goals") }
                     )
                 }
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
             }
 
             // Mascot Section
             item {
                 MascotSection(balance = balance, totalExpense = totalExpense)
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
             }
 
             item {
@@ -226,7 +293,7 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     TextButton(onClick = { onNavigate("analytics") }) {
-                        Text("See All", color = PrimaryGreen)
+                        Text("See All & Charts", color = PrimaryGreen)
                     }
                 }
             }
@@ -259,6 +326,8 @@ fun HomeScreen(
                     ) {
                         ExpenseListItem(
                             expense = expense,
+                            currencySymbol = currency.symbol,
+                            onClick = { onEditExpense(expense.id) },
                             onDelete = { viewModel.deleteExpense(expense.id) }
                         )
                     }
@@ -269,11 +338,11 @@ fun HomeScreen(
 }
 
 @Composable
-fun MiniStat(label: String, amount: Double, color: Color, arrow: String) {
+fun MiniStat(label: String, amount: Double, color: Color, arrow: String, symbol: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("$arrow $label", color = TextSecondary, fontSize = 12.sp)
         Text(
-            "LKR ${String.format("%,.0f", amount)}",
+            "$symbol ${String.format("%,.0f", amount)}",
             color = color,
             fontWeight = FontWeight.Bold,
             fontSize = 15.sp
@@ -345,7 +414,6 @@ fun MascotSection(balance: Double, totalExpense: Double) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Animated mascot
             val infiniteTransition = rememberInfiniteTransition(label = "mascot")
             val bounce by infiniteTransition.animateFloat(
                 initialValue = 0f, targetValue = 8f,
@@ -391,7 +459,12 @@ fun MascotSection(balance: Double, totalExpense: Double) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExpenseListItem(expense: Expense, onDelete: () -> Unit) {
+fun ExpenseListItem(
+    expense: Expense,
+    currencySymbol: String = "Rs.",
+    onClick: () -> Unit = {},
+    onDelete: () -> Unit
+) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     if (showDeleteDialog) {
@@ -410,7 +483,7 @@ fun ExpenseListItem(expense: Expense, onDelete: () -> Unit) {
         )
     }
 
-    val dateStr = SimpleDateFormat("dd MMM", Locale.getDefault())
+    val dateStr = SimpleDateFormat("dd MMM, yyyy", Locale.getDefault())
         .format(Date(expense.dateMillis))
 
     Card(
@@ -418,7 +491,7 @@ fun ExpenseListItem(expense: Expense, onDelete: () -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 4.dp)
             .combinedClickable(
-                onClick = {},
+                onClick = onClick,
                 onLongClick = { showDeleteDialog = true }
             ),
         shape = RoundedCornerShape(16.dp),
@@ -433,10 +506,10 @@ fun ExpenseListItem(expense: Expense, onDelete: () -> Unit) {
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(expense.category.color.copy(alpha = 0.2f)),
+                    .background(Color(expense.categoryColorHex).copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(expense.category.emoji, fontSize = 22.sp)
+                Text(expense.categoryEmoji, fontSize = 22.sp)
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -449,21 +522,39 @@ fun ExpenseListItem(expense: Expense, onDelete: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    "${expense.category.displayName} • $dateStr",
-                    fontSize = 12.sp,
-                    color = TextSecondary
+                    "${expense.categoryName} • ${expense.wallet.emoji} ${expense.wallet.displayName.split(" ").first()} • $dateStr",
+                    fontSize = 11.sp,
+                    color = TextSecondary,
+                    maxLines = 1
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    "${if (expense.type == ExpenseType.INCOME) "+" else "-"}LKR ${String.format("%,.0f", expense.amount)}",
+                    "${if (expense.type == ExpenseType.INCOME) "+" else "-"}$currencySymbol ${String.format("%,.0f", expense.amount)}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     color = if (expense.type == ExpenseType.INCOME) PrimaryGreen else AccentRed
                 )
-                Text(
-                    moodEmoji(expense.mood),
-                    fontSize = 14.sp
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (!expense.receiptImagePath.isNullOrEmpty()) {
+                        Text("🧾", fontSize = 12.sp)
+                    }
+                    Text(
+                        moodEmoji(expense.mood),
+                        fontSize = 14.sp
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            IconButton(
+                onClick = onClick,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Edit Transaction",
+                    tint = TextSecondary.copy(alpha = 0.7f),
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }

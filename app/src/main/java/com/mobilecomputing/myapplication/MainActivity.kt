@@ -15,21 +15,41 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.*
+import androidx.navigation.navArgument
 import com.mobilecomputing.myapplication.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
+    private var expenseViewModel: ExpenseViewModel? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val expenseViewModel: ExpenseViewModel = viewModel()
-            val isDarkMode by expenseViewModel.isDarkMode.collectAsState()
+            val vm: ExpenseViewModel = viewModel()
+            expenseViewModel = vm
+            val isDarkMode by vm.isDarkMode.collectAsState()
+            val isPinEnabled by vm.isPinEnabled.collectAsState()
+            val isAppUnlocked by vm.isAppUnlocked.collectAsState()
 
             MyApplicationTheme(darkTheme = isDarkMode) {
-                ExpenseTrackerApp(viewModel = expenseViewModel)
+                if (isPinEnabled && !isAppUnlocked) {
+                    PinLockScreen(
+                        viewModel = vm,
+                        onSuccess = { /* state changes inside viewModel will trigger recomposition */ }
+                    )
+                } else {
+                    ExpenseTrackerApp(viewModel = vm)
+                }
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Lock the app whenever the user leaves or minimizes it
+        expenseViewModel?.lockApp()
     }
 }
 
@@ -102,11 +122,16 @@ fun ExpenseTrackerApp(viewModel: ExpenseViewModel) {
                 HomeScreen(
                     viewModel = viewModel,
                     onAddExpense = { navController.navigate("add_expense") },
+                    onEditExpense = { id -> navController.navigate("edit_expense/$id") },
                     onNavigate = { navController.navigate(it) }
                 )
             }
             composable(Screen.Analytics.route) {
-                AnalyticsScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+                AnalyticsScreen(
+                    viewModel = viewModel,
+                    onEditExpense = { id -> navController.navigate("edit_expense/$id") },
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(Screen.Goals.route) {
                 GoalsScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
@@ -116,6 +141,37 @@ fun ExpenseTrackerApp(viewModel: ExpenseViewModel) {
             }
             composable("add_expense") {
                 AddExpenseScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = "edit_expense/{expenseId}",
+                arguments = listOf(navArgument("expenseId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val expenseId = backStackEntry.arguments?.getString("expenseId")
+                AddExpenseScreen(
+                    viewModel = viewModel,
+                    expenseId = expenseId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("settings") {
+                SettingsScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onManageCategories = { navController.navigate("manage_categories") }
+                )
+            }
+            composable("manage_categories") {
+                ManageCategoriesScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("search_transactions") {
+                TransactionsSearchScreen(
+                    viewModel = viewModel,
+                    onEditExpense = { id -> navController.navigate("edit_expense/$id") },
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }

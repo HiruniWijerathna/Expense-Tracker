@@ -5,43 +5,56 @@ import com.mobilecomputing.myapplication.ui.theme.*
 
 enum class ExpenseType { EXPENSE, INCOME }
 
-enum class ExpenseCategory(
-    val displayName: String,
-    val emoji: String,
-    val color: Color,
-    val type: ExpenseType = ExpenseType.EXPENSE
-) {
-    // Expense Categories
-    FOOD("Food & Drinks", "🍔", CategoryFood, ExpenseType.EXPENSE),
-    TRANSPORT("Transport", "🚗", CategoryTransport, ExpenseType.EXPENSE),
-    SHOPPING("Shopping", "🛍️", CategoryShopping, ExpenseType.EXPENSE),
-    HEALTH("Health", "💊", CategoryHealth, ExpenseType.EXPENSE),
-    ENTERTAINMENT("Entertainment", "🎮", CategoryEntertainment, ExpenseType.EXPENSE),
-    BILLS("Bills & Utilities", "⚡", CategoryBills, ExpenseType.EXPENSE),
-    OTHER_EXPENSE("Other Expense", "📦", CategoryOther, ExpenseType.EXPENSE),
-
-    // Income Categories
-    SALARY("Salary", "💼", CategorySalary, ExpenseType.INCOME),
-    BUSINESS("Business", "🏢", CategoryBusiness, ExpenseType.INCOME),
-    FREELANCE("Freelance", "💻", CategoryFreelance, ExpenseType.INCOME),
-    INVESTMENT("Investment", "📈", CategoryInvestment, ExpenseType.INCOME),
-    GIFT("Gift", "🎁", CategoryGift, ExpenseType.INCOME),
-    OTHER_INCOME("Other Income", "💰", CategoryOther, ExpenseType.INCOME);
-
-    companion object {
-        fun getCategoriesForType(type: ExpenseType): List<ExpenseCategory> {
-            return entries.filter { it.type == type }
-        }
-    }
+enum class WalletAccount(val displayName: String, val emoji: String) {
+    CASH("Cash Wallet", "💵"),
+    BANK("Bank Account", "🏦"),
+    CREDIT_CARD("Credit Card", "💳"),
+    SAVINGS("Savings", "🐷")
 }
+
+data class CategoryItem(
+    val id: String,
+    val name: String,
+    val emoji: String,
+    val colorHex: Long,
+    val type: ExpenseType = ExpenseType.EXPENSE,
+    val isCustom: Boolean = false
+) {
+    val color: Color get() = Color(colorHex)
+}
+
+val defaultCategories = listOf(
+    // Expense
+    CategoryItem("cat_food", "Food & Drinks", "🍔", 0xFFFF5722, ExpenseType.EXPENSE),
+    CategoryItem("cat_transport", "Transport", "🚗", 0xFF2196F3, ExpenseType.EXPENSE),
+    CategoryItem("cat_shopping", "Shopping", "🛍️", 0xFFE91E63, ExpenseType.EXPENSE),
+    CategoryItem("cat_health", "Health", "💊", 0xFF4CAF50, ExpenseType.EXPENSE),
+    CategoryItem("cat_entertainment", "Entertainment", "🎮", 0xFF9C27B0, ExpenseType.EXPENSE),
+    CategoryItem("cat_bills", "Bills & Utilities", "⚡", 0xFFFF9800, ExpenseType.EXPENSE),
+    CategoryItem("cat_education", "Education", "📚", 0xFF00BCD4, ExpenseType.EXPENSE),
+    CategoryItem("cat_other_exp", "Other Expense", "📦", 0xFF607D8B, ExpenseType.EXPENSE),
+
+    // Income
+    CategoryItem("cat_salary", "Salary", "💼", 0xFF00C853, ExpenseType.INCOME),
+    CategoryItem("cat_business", "Business", "🏢", 0xFF3F51B5, ExpenseType.INCOME),
+    CategoryItem("cat_freelance", "Freelance", "💻", 0xFF00B0FF, ExpenseType.INCOME),
+    CategoryItem("cat_investment", "Investment", "📈", 0xFFFFAB00, ExpenseType.INCOME),
+    CategoryItem("cat_gift", "Gift", "🎁", 0xFFFF4081, ExpenseType.INCOME),
+    CategoryItem("cat_other_inc", "Other Income", "💰", 0xFF607D8B, ExpenseType.INCOME)
+)
 
 data class Expense(
     val id: String = java.util.UUID.randomUUID().toString(),
     val title: String,
     val amount: Double,
-    val category: ExpenseCategory,
+    val categoryId: String,
+    val categoryName: String,
+    val categoryEmoji: String,
+    val categoryColorHex: Long,
     val type: ExpenseType = ExpenseType.EXPENSE,
+    val wallet: WalletAccount = WalletAccount.CASH,
     val note: String = "",
+    val receiptImagePath: String? = null,
     val mood: Int = 3, // 1=regret, 2=meh, 3=ok, 4=happy, 5=great
     val dateMillis: Long = System.currentTimeMillis()
 )

@@ -1,5 +1,8 @@
 package com.mobilecomputing.myapplication
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -16,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -28,16 +33,67 @@ import java.util.*
 @Composable
 fun AddExpenseScreen(
     viewModel: ExpenseViewModel,
+    expenseId: String? = null,
     onBack: () -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(ExpenseCategory.FOOD) }
-    var expenseType by remember { mutableStateOf(ExpenseType.EXPENSE) }
-    var selectedDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val context = LocalContext.current
+    val existingExpense = remember(expenseId, viewModel.expenses) {
+        viewModel.expenses.value.find { it.id == expenseId }
+    }
+    val isEditMode = existingExpense != null
+
+    val categories by viewModel.categories.collectAsState()
+    val currency by viewModel.currency.collectAsState()
+
+    var expenseType by remember(existingExpense) {
+        mutableStateOf(existingExpense?.type ?: ExpenseType.EXPENSE)
+    }
+
+    val availableCategories = categories.filter { it.type == expenseType }
+
+    var selectedCategory by remember(existingExpense, availableCategories) {
+        mutableStateOf(
+            if (existingExpense != null) {
+                categories.find { it.id == existingExpense.categoryId } ?: availableCategories.firstOrNull() ?: defaultCategories[0]
+            } else {
+                availableCategories.firstOrNull() ?: defaultCategories[0]
+            }
+        )
+    }
+
+    var selectedWallet by remember(existingExpense) {
+        mutableStateOf(existingExpense?.wallet ?: WalletAccount.CASH)
+    }
+
+    var title by remember(existingExpense) { mutableStateOf(existingExpense?.title ?: "") }
+    var amount by remember(existingExpense) {
+        mutableStateOf(
+            existingExpense?.let {
+                if (it.amount % 1.0 == 0.0) it.amount.toLong().toString() else it.amount.toString()
+            } ?: ""
+        )
+    }
+
+    var receiptPath by remember(existingExpense) {
+        mutableStateOf(existingExpense?.receiptImagePath)
+    }
+
+    // Photo picker launcher
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            val savedPath = ImageHelper.saveImageToInternalStorage(context, uri)
+            receiptPath = savedPath
+        }
+    }
+
+    var selectedDateMillis by remember(existingExpense) {
+        mutableLongStateOf(existingExpense?.dateMillis ?: System.currentTimeMillis())
+    }
     var showDatePicker by remember { mutableStateOf(false) }
-    var note by remember { mutableStateOf("") }
-    var mood by remember { mutableIntStateOf(3) }
+    var note by remember(existingExpense) { mutableStateOf(existingExpense?.note ?: "") }
+    var mood by remember(existingExpense) { mutableIntStateOf(existingExpense?.mood ?: 3) }
     var showError by remember { mutableStateOf(false) }
 
     val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDateMillis)
@@ -68,7 +124,12 @@ fun AddExpenseScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add Transaction", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        if (isEditMode) "Edit Transaction" else "Add Transaction",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -110,7 +171,8 @@ fun AddExpenseScreen(
                             .clickable {
                                 if (expenseType != type) {
                                     expenseType = type
-                                    selectedCategory = if (type == ExpenseType.EXPENSE) ExpenseCategory.FOOD else ExpenseCategory.SALARY
+                                    val newCats = categories.filter { it.type == type }
+                                    selectedCategory = newCats.firstOrNull() ?: defaultCategories[0]
                                 }
                             }
                             .padding(vertical = 12.dp),
@@ -132,8 +194,8 @@ fun AddExpenseScreen(
                 onValueChange = { input ->
                     if (input.length <= 10) amount = input.filter { c -> c.isDigit() || c == '.' }
                 },
-                label = { Text("Amount (LKR)") },
-                leadingIcon = { Text("💰", modifier = Modifier.padding(start = 12.dp)) },
+                label = { Text("Amount (${currency.code})") },
+                leadingIcon = { Text(currency.symbol, modifier = Modifier.padding(start = 12.dp), fontWeight = FontWeight.Bold) },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 isError = showError && amount.isBlank(),
@@ -156,11 +218,34 @@ fun AddExpenseScreen(
                             "Where did you earn from? (Optional)"
                     )
                 },
-                placeholder = { Text(selectedCategory.displayName) },
+                placeholder = { Text(selectedCategory.name) },
                 leadingIcon = { Icon(Icons.Default.Edit, null) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp)
             )
+
+            // Account / Wallet Selector
+            Text("Payment Account / Wallet", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                WalletAccount.values().forEach { wallet ->
+                    val isSel = wallet == selectedWallet
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSel) PrimaryGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
+                            .border(if (isSel) 2.dp else 0.dp, if (isSel) PrimaryGreen else Color.Transparent, RoundedCornerShape(12.dp))
+                            .clickable { selectedWallet = wallet }
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    ) {
+                        Text("${wallet.emoji} ${wallet.displayName}", fontSize = 13.sp, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal)
+                    }
+                }
+            }
 
             // Date Picker Field
             val formattedDate = SimpleDateFormat("dd MMMM yyyy", Locale.getDefault()).format(Date(selectedDateMillis))
@@ -197,11 +282,68 @@ fun AddExpenseScreen(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp
             )
-            CategoryGrid(
-                type = expenseType,
+            CategorySelectorGrid(
+                categories = availableCategories,
                 selected = selectedCategory,
                 onSelect = { selectedCategory = it }
             )
+
+            // Receipt / Bill Attachment Section
+            Text("Receipt / Bill Image (Optional) 🧾", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+
+            val receiptBitmap = remember(receiptPath) {
+                ImageHelper.loadBitmapFromPath(receiptPath)
+            }
+
+            if (receiptBitmap != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.dp, PrimaryGreen.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                ) {
+                    Image(
+                        bitmap = receiptBitmap,
+                        contentDescription = "Receipt Attachment",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    IconButton(
+                        onClick = { receiptPath = null },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                            .size(32.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove receipt", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                }
+            } else {
+                OutlinedCard(
+                    onClick = {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = PrimaryGreen)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Attach Bill / Receipt Photo", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = PrimaryGreen)
+                    }
+                }
+            }
 
             // Note (optional)
             OutlinedTextField(
@@ -233,18 +375,42 @@ fun AddExpenseScreen(
                     if (amount.isBlank() || amountVal == null || amountVal <= 0.0) {
                         showError = true
                     } else {
-                        val finalTitle = title.trim().ifEmpty { selectedCategory.displayName }
-                        viewModel.addExpense(
-                            Expense(
-                                title = finalTitle,
-                                amount = amountVal,
-                                category = selectedCategory,
-                                type = expenseType,
-                                note = note.trim(),
-                                mood = mood,
-                                dateMillis = selectedDateMillis
+                        val finalTitle = title.trim().ifEmpty { selectedCategory.name }
+                        if (isEditMode) {
+                            viewModel.updateExpense(
+                                existingExpense!!.copy(
+                                    title = finalTitle,
+                                    amount = amountVal,
+                                    categoryId = selectedCategory.id,
+                                    categoryName = selectedCategory.name,
+                                    categoryEmoji = selectedCategory.emoji,
+                                    categoryColorHex = selectedCategory.colorHex,
+                                    type = expenseType,
+                                    wallet = selectedWallet,
+                                    note = note.trim(),
+                                    receiptImagePath = receiptPath,
+                                    mood = mood,
+                                    dateMillis = selectedDateMillis
+                                )
                             )
-                        )
+                        } else {
+                            viewModel.addExpense(
+                                Expense(
+                                    title = finalTitle,
+                                    amount = amountVal,
+                                    categoryId = selectedCategory.id,
+                                    categoryName = selectedCategory.name,
+                                    categoryEmoji = selectedCategory.emoji,
+                                    categoryColorHex = selectedCategory.colorHex,
+                                    type = expenseType,
+                                    wallet = selectedWallet,
+                                    note = note.trim(),
+                                    receiptImagePath = receiptPath,
+                                    mood = mood,
+                                    dateMillis = selectedDateMillis
+                                )
+                            )
+                        }
                         onBack()
                     }
                 },
@@ -259,7 +425,11 @@ fun AddExpenseScreen(
                 Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Save ${if (expenseType == ExpenseType.INCOME) "Income" else "Expense"}",
+                    if (isEditMode) {
+                        "Update ${if (expenseType == ExpenseType.INCOME) "Income" else "Expense"}"
+                    } else {
+                        "Save ${if (expenseType == ExpenseType.INCOME) "Income" else "Expense"}"
+                    },
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
@@ -269,12 +439,11 @@ fun AddExpenseScreen(
 }
 
 @Composable
-fun CategoryGrid(
-    type: ExpenseType,
-    selected: ExpenseCategory,
-    onSelect: (ExpenseCategory) -> Unit
+fun CategorySelectorGrid(
+    categories: List<CategoryItem>,
+    selected: CategoryItem,
+    onSelect: (CategoryItem) -> Unit
 ) {
-    val categories = ExpenseCategory.getCategoriesForType(type)
     val rows = categories.chunked(4)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -284,7 +453,7 @@ fun CategoryGrid(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 for (cat in row) {
-                    val isSelected = cat == selected
+                    val isSelected = cat.id == selected.id
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -305,14 +474,14 @@ fun CategoryGrid(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(cat.emoji, fontSize = 22.sp)
                             Text(
-                                text = cat.displayName.split(" ").first(),
-                                fontSize = 9.sp,
+                                text = cat.name.split(" ").first(),
+                                fontSize = 10.sp,
+                                maxLines = 1,
                                 color = if (isSelected) cat.color else TextSecondary
                             )
                         }
                     }
                 }
-                // Fill empty slots in last row
                 val empty = 4 - row.size
                 repeat(empty) {
                     Spacer(modifier = Modifier.weight(1f))
