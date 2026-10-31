@@ -1,7 +1,7 @@
 # 💰 Smart Expense Tracker & Budget Manager
 
 <p align="center">
-  <img src="banner.png" alt="Fitness App Banner" width="100%" />
+  <img src="banner.png" alt="Expense Tracker Banner" width="100%" />
 </p>
 
 <p align="center">
