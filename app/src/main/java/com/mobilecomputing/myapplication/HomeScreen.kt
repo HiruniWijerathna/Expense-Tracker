@@ -6,6 +6,8 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,14 +48,28 @@ fun HomeScreen(
     val totalExpense = viewModel.totalExpenseThisMonth
     val totalIncome = viewModel.totalIncomeThisMonth
     val balance = totalIncome - totalExpense
+
+    val totalExpenseAllTime = viewModel.totalExpenseAllTime
+    val totalIncomeAllTime = viewModel.totalIncomeAllTime
+    val totalBalanceAllTime = viewModel.totalBalanceAllTime
+
     val remainingBudget = (monthlyBudget - totalExpense).coerceAtLeast(0.0)
     val budgetProgress = if (monthlyBudget > 0) (totalExpense / monthlyBudget).toFloat().coerceIn(0f, 1f) else 0f
+
+    // Balance pager state (0 = This Month, 1 = Total / All Time)
+    val balancePagerState = rememberPagerState(pageCount = { 2 })
 
     // Animate balance
     val animatedBalance by animateFloatAsState(
         targetValue = balance.toFloat(),
         animationSpec = tween(800, easing = EaseOutQuart),
         label = "balance"
+    )
+
+    val animatedTotalBalance by animateFloatAsState(
+        targetValue = totalBalanceAllTime.toFloat(),
+        animationSpec = tween(800, easing = EaseOutQuart),
+        label = "totalBalance"
     )
 
     Scaffold(
@@ -118,63 +134,123 @@ fun HomeScreen(
             }
 
             item {
-                // Balance & Income/Expense Card
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    Color(0xFF1A3A2A),
-                                    Color(0xFF0D2018),
-                                    Color(0xFF00C853).copy(alpha = 0.3f)
-                                )
-                            )
-                        )
-                        .border(
-                            1.dp,
-                            PrimaryGreen.copy(alpha = 0.3f),
-                            RoundedCornerShape(24.dp)
-                        )
-                        .padding(24.dp)
+                // Balance & Income/Expense Horizontal Pager (This Month & Total All-Time)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            "This Month's Balance",
-                            color = TextSecondary,
-                            fontSize = 13.sp,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "${currency.symbol} ${String.format("%,.0f", abs(animatedBalance.toDouble()))}",
-                            fontSize = 38.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (balance >= 0) PrimaryGreen else AccentRed
-                        )
-                        Text(
-                            text = if (balance >= 0) "✅ Healthy Financial Health" else "⚠️ Spending exceeding income!",
-                            color = if (balance >= 0) PrimaryGreenLight else AccentRed.copy(alpha = 0.8f),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                        Spacer(Modifier.height(20.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceAround
+                    HorizontalPager(
+                        state = balancePagerState,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { page ->
+                        val isThisMonth = (page == 0)
+                        val displayBalance = if (isThisMonth) balance else totalBalanceAllTime
+                        val animBal = if (isThisMonth) animatedBalance else animatedTotalBalance
+                        val inc = if (isThisMonth) totalIncome else totalIncomeAllTime
+                        val exp = if (isThisMonth) totalExpense else totalExpenseAllTime
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = if (isThisMonth) {
+                                            listOf(
+                                                Color(0xFF1A3A2A),
+                                                Color(0xFF0D2018),
+                                                Color(0xFF00C853).copy(alpha = 0.3f)
+                                            )
+                                        } else {
+                                            listOf(
+                                                Color(0xFF1E293B),
+                                                Color(0xFF0F172A),
+                                                Color(0xFF38BDF8).copy(alpha = 0.25f)
+                                            )
+                                        }
+                                    )
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isThisMonth) PrimaryGreen.copy(alpha = 0.3f) else Color(0xFF38BDF8).copy(alpha = 0.3f),
+                                    RoundedCornerShape(24.dp)
+                                )
+                                .padding(24.dp)
                         ) {
-                            MiniStat("Income", totalIncome, PrimaryGreen, "⬆️", currency.symbol)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (isThisMonth) "This Month's Balance" else "Total Overall Balance",
+                                        color = TextSecondary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isThisMonth) "📅" else "🌐",
+                                        fontSize = 13.sp
+                                    )
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = "${if (displayBalance < 0) "-" else ""}${currency.symbol} ${String.format("%,.0f", abs(animBal.toDouble()))}",
+                                    fontSize = 38.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (displayBalance >= 0) PrimaryGreen else AccentRed
+                                )
+                                Text(
+                                    text = if (displayBalance >= 0) "✅ Healthy Financial Health" else "⚠️ Spending exceeding income!",
+                                    color = if (displayBalance >= 0) PrimaryGreenLight else AccentRed.copy(alpha = 0.8f),
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                                Spacer(Modifier.height(20.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceAround
+                                ) {
+                                    MiniStat("Income", inc, PrimaryGreen, "⬆️", currency.symbol)
+                                    Box(
+                                        modifier = Modifier
+                                            .width(1.dp)
+                                            .height(40.dp)
+                                            .background(TextSecondary.copy(alpha = 0.3f))
+                                    )
+                                    MiniStat("Expenses", exp, AccentRed, "⬇️", currency.symbol)
+                                }
+                            }
+                        }
+                    }
+
+                    // Pager indicator dots with swipe hint
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(2) { index ->
+                            val isSelected = balancePagerState.currentPage == index
                             Box(
                                 modifier = Modifier
-                                    .width(1.dp)
-                                    .height(40.dp)
-                                    .background(TextSecondary.copy(alpha = 0.3f))
+                                    .padding(horizontal = 4.dp)
+                                    .size(if (isSelected) 8.dp else 6.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isSelected) PrimaryGreen else TextSecondary.copy(alpha = 0.4f)
+                                    )
                             )
-                            MiniStat("Expenses", totalExpense, AccentRed, "⬇️", currency.symbol)
                         }
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = if (balancePagerState.currentPage == 0) "Swipe for Total ➡️" else "⬅️ Swipe for This Month",
+                            fontSize = 11.sp,
+                            color = TextSecondary.copy(alpha = 0.7f)
+                        )
                     }
                 }
                 Spacer(Modifier.height(16.dp))

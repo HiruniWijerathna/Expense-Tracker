@@ -263,6 +263,18 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // Stats calculations
+    val totalExpenseAllTime: Double get() {
+        return _expenses.value.filter { it.type == ExpenseType.EXPENSE }.sumOf { it.amount }
+    }
+
+    val totalIncomeAllTime: Double get() {
+        return _expenses.value.filter { it.type == ExpenseType.INCOME }.sumOf { it.amount }
+    }
+
+    val totalBalanceAllTime: Double get() {
+        return totalIncomeAllTime - totalExpenseAllTime
+    }
+
     val totalExpenseThisMonth: Double get() {
         val cal = Calendar.getInstance()
         val month = cal.get(Calendar.MONTH)

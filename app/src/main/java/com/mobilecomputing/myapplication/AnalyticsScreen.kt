@@ -3,6 +3,8 @@ package com.mobilecomputing.myapplication
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,6 +39,10 @@ fun AnalyticsScreen(
     val currency by viewModel.currency.collectAsState()
     val totalExpense = viewModel.totalExpenseThisMonth
     val totalIncome = viewModel.totalIncomeThisMonth
+    val totalExpenseAllTime = viewModel.totalExpenseAllTime
+    val totalIncomeAllTime = viewModel.totalIncomeAllTime
+
+    val summaryPagerState = rememberPagerState(pageCount = { 2 })
 
     var selectedPeriod by remember { mutableStateOf(ChartPeriod.DAILY) }
 
@@ -75,27 +81,84 @@ fun AnalyticsScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // 1. Summary Card
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            // 1. Summary Horizontal Pager (This Month & Total Overall)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text("This Month Summary", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Spacer(Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
+                HorizontalPager(
+                    state = summaryPagerState,
+                    modifier = Modifier.fillMaxWidth()
+                ) { page ->
+                    val isThisMonth = (page == 0)
+                    val inc = if (isThisMonth) totalIncome else totalIncomeAllTime
+                    val exp = if (isThisMonth) totalExpense else totalExpenseAllTime
+                    val net = inc - exp
+
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        SummaryItem("Income ⬆️", totalIncome, PrimaryGreen, currency.symbol)
-                        SummaryItem("Expense ⬇️", totalExpense, AccentRed, currency.symbol)
-                        SummaryItem(
-                            "Net Saved",
-                            totalIncome - totalExpense,
-                            if (totalIncome >= totalExpense) PrimaryGreen else AccentRed,
-                            currency.symbol
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isThisMonth) "This Month Summary" else "Total Overall Summary",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp
+                                )
+                                Text(
+                                    text = if (isThisMonth) "📅 This Month" else "🌐 All-Time",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            Spacer(Modifier.height(16.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceAround
+                            ) {
+                                SummaryItem("Income ⬆️", inc, PrimaryGreen, currency.symbol)
+                                SummaryItem("Expense ⬇️", exp, AccentRed, currency.symbol)
+                                SummaryItem(
+                                    "Net Saved",
+                                    net,
+                                    if (net >= 0) PrimaryGreen else AccentRed,
+                                    currency.symbol
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    repeat(2) { index ->
+                        val isSelected = summaryPagerState.currentPage == index
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp)
+                                .size(if (isSelected) 8.dp else 6.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) PrimaryGreen else TextSecondary.copy(alpha = 0.4f)
+                                )
                         )
                     }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = if (summaryPagerState.currentPage == 0) "Swipe for Total ➡️" else "⬅️ Swipe for This Month",
+                        fontSize = 11.sp,
+                        color = TextSecondary.copy(alpha = 0.7f)
+                    )
                 }
             }
 
